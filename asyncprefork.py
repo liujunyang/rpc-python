@@ -73,7 +73,7 @@ class RPCServer(asyncore.dispatcher):
         self.listen(1)
         self.prefork(10)
 
-    def prefork(self, cn):
+    def prefork(self, n):
         for i in range(n):
             pid = os.fork()
             if pid < 0:
@@ -92,5 +92,3 @@ class RPCServer(asyncore.dispatcher):
 if __name__ == "__main__":
     RPCServer("localhost", 8080)
     asyncore.loop()
-    
-
