@@ -129,6 +129,47 @@ class RPCServer(asyncore.dispatcher):
                     continue
                 raise ex
             print "after kill", pid
+        for pid in pids:
+            while True:
+                try:
+                    os.waitpid(pid, 0) # 收割目标子进程
+                    break
+                except OSError, ex:
+                    if ex.args[0] == errno.ECHILD: # 子进程已经割过了
+                        raise ex
+            print "wait over", pid
+
+    def reap_child(self, sig, frame):
+        print "before reap"
+        while True:
+            try:
+                info = os.waitpid(-1, os.WNOHANG) # 收割任意子进程
+                break
+            except OSError, ex:
+                if ex.args[0] == errno.ECHILD:
+                    return # 没有子进程可以收割
+                if ex.args[0] != errno.EINTR:
+                    raise ex # 被其他信号打断要重试
+        pid = info(0)
+        try:
+            self.child_pids.remove(pid)
+        except ValueError:
+            pass
+        print "after reap", pid
+
+    def register_parent_signal(self):
+        signal.signal(signal.SIGINT, self.exit_parent)
+        signal.signal(signal.SIGTERM, self.exit_parent)
+        signal.signal(signal.SIGCHILD, self.reap_child) # 监听子进程退出
+
+    def exit_child(self, sig, frame):
+        self.close()         # 关闭 serversocket
+        asyncore.close_all() # 关闭所有 clientsocket
+        print "all closed"
+
+    def register_child_signal(self):
+            signal.signal(signal.SIGINT, self.exit_child)
+            signal.signal(signal.SIGTERM, self.exit_child)
 
     def handle_accept(self):
         pair = self.accept()
